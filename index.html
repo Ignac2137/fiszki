@@ -1,0 +1,807 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#0f0f0f">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Fiszki">
+<title>Fiszki</title>
+<link rel="manifest" href="manifest.json">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0f0f0f;
+  --surface: #1a1a1a;
+  --surface2: #222222;
+  --border: rgba(255,255,255,0.08);
+  --border2: rgba(255,255,255,0.14);
+  --text: #f0ede8;
+  --text2: #8a8580;
+  --text3: #555250;
+  --accent: #c8f060;
+  --accent-dark: #9ab840;
+  --red: #ff6b6b;
+  --amber: #ffb347;
+  --green: #6bcf8f;
+  --blue: #6ba8ff;
+  --radius: 16px;
+  --radius-sm: 10px;
+  --tab-h: 68px;
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+html, body { height: 100%; overflow: hidden; background: var(--bg); }
+body { font-family: 'DM Sans', sans-serif; color: var(--text); overscroll-behavior: none; }
+
+/* LAYOUT */
+#app { height: 100vh; display: flex; flex-direction: column; }
+.views { flex: 1; overflow: hidden; position: relative; }
+.view { position: absolute; inset: 0; overflow-y: auto; overflow-x: hidden; padding: 0 0 calc(var(--tab-h) + var(--safe-bottom) + 16px); display: none; -webkit-overflow-scrolling: touch; }
+.view.active { display: block; }
+.view-header { padding: 52px 20px 20px; }
+.view-title { font-family: 'DM Serif Display', serif; font-size: 32px; color: var(--text); }
+.view-sub { font-size: 14px; color: var(--text2); margin-top: 4px; }
+
+/* BOTTOM NAV */
+.bottom-nav { height: calc(var(--tab-h) + var(--safe-bottom)); padding-bottom: var(--safe-bottom); background: rgba(15,15,15,0.92); backdrop-filter: blur(20px); border-top: 0.5px solid var(--border); display: flex; position: relative; z-index: 100; }
+.nav-item { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; cursor: pointer; transition: all .2s; padding: 8px 0; border: none; background: none; color: var(--text3); font-family: 'DM Sans', sans-serif; font-size: 11px; }
+.nav-item.active { color: var(--accent); }
+.nav-icon { font-size: 22px; line-height: 1; transition: transform .2s; }
+.nav-item.active .nav-icon { transform: scale(1.1); }
+
+/* CARDS */
+.card { background: var(--surface); border: 0.5px solid var(--border); border-radius: var(--radius); padding: 16px; margin: 0 16px 12px; }
+.card-sm { padding: 12px 14px; }
+
+/* LEARN VIEW */
+.learn-deck-row { display: flex; align-items: center; gap: 10px; padding: 0 16px 16px; flex-wrap: wrap; }
+.pill-select { background: var(--surface); border: 0.5px solid var(--border2); border-radius: 20px; color: var(--text); font-family: 'DM Sans', sans-serif; font-size: 14px; padding: 8px 14px; flex: 1; min-width: 0; appearance: none; -webkit-appearance: none; }
+.btn-icon { width: 40px; height: 40px; border-radius: 50%; background: var(--surface); border: 0.5px solid var(--border2); color: var(--text2); font-size: 18px; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+
+.progress-wrap { padding: 0 16px 16px; }
+.progress-track { height: 3px; background: var(--surface2); border-radius: 2px; }
+.progress-fill { height: 3px; background: var(--accent); border-radius: 2px; transition: width .4s cubic-bezier(.4,0,.2,1); }
+.progress-label { font-size: 12px; color: var(--text3); margin-top: 8px; }
+
+/* FLASHCARD FLIP */
+.flip-scene { padding: 0 16px 16px; perspective: 1200px; }
+.flip-card { position: relative; width: 100%; min-height: 260px; transform-style: preserve-3d; transition: transform .55s cubic-bezier(.4,0,.2,1); cursor: pointer; }
+.flip-card.flipped { transform: rotateY(180deg); }
+.flip-face { position: absolute; inset: 0; backface-visibility: hidden; border-radius: var(--radius); padding: 28px 24px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; min-height: 260px; }
+.flip-front { background: var(--surface); border: 0.5px solid var(--border2); }
+.flip-back { background: var(--surface2); border: 0.5px solid var(--border2); transform: rotateY(180deg); }
+.flip-label { font-size: 11px; letter-spacing: .1em; color: var(--text3); text-transform: uppercase; margin-bottom: 20px; }
+.flip-content { font-family: 'DM Serif Display', serif; font-size: 28px; line-height: 1.3; color: var(--text); }
+.flip-hint { font-size: 12px; color: var(--text3); margin-top: 20px; }
+.flip-status { position: absolute; top: 14px; right: 14px; font-size: 11px; padding: 3px 10px; border-radius: 20px; font-weight: 500; }
+.s-new { background: rgba(107,168,255,0.15); color: var(--blue); }
+.s-learning { background: rgba(255,179,71,0.15); color: var(--amber); }
+.s-known { background: rgba(107,207,143,0.15); color: var(--green); }
+
+.rating-row { display: flex; gap: 10px; padding: 0 16px 16px; }
+.r-btn { flex: 1; padding: 14px 8px; border-radius: var(--radius-sm); border: 0.5px solid var(--border2); background: var(--surface); color: var(--text2); font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 500; cursor: pointer; transition: all .15s; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.r-btn .ico { font-size: 20px; }
+.r-btn.bad { border-color: rgba(255,107,107,0.3); color: var(--red); }
+.r-btn.bad:active { background: rgba(255,107,107,0.1); }
+.r-btn.ok { border-color: rgba(255,179,71,0.3); color: var(--amber); }
+.r-btn.ok:active { background: rgba(255,179,71,0.1); }
+.r-btn.good { border-color: rgba(107,207,143,0.3); color: var(--green); }
+.r-btn.good:active { background: rgba(107,207,143,0.1); }
+
+.empty-card { padding: 48px 24px; text-align: center; background: var(--surface); border: 0.5px dashed var(--border2); border-radius: var(--radius); margin: 0 16px; }
+.empty-ico { font-size: 40px; margin-bottom: 12px; }
+.empty-title { font-size: 16px; font-weight: 500; margin-bottom: 6px; }
+.empty-sub { font-size: 13px; color: var(--text2); }
+
+.done-wrap { padding: 32px 20px; text-align: center; }
+.done-ico { font-size: 56px; margin-bottom: 16px; }
+.done-title { font-family: 'DM Serif Display', serif; font-size: 28px; margin-bottom: 8px; }
+.done-sub { font-size: 14px; color: var(--text2); margin-bottom: 24px; }
+.done-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 24px; }
+.done-stat { background: var(--surface); border-radius: var(--radius-sm); padding: 14px; }
+.done-num { font-size: 28px; font-weight: 600; }
+.done-lbl { font-size: 12px; color: var(--text2); margin-top: 2px; }
+.btn-main { display: inline-flex; align-items: center; gap: 8px; padding: 14px 28px; background: var(--accent); color: #0f0f0f; border-radius: 24px; font-size: 15px; font-weight: 600; border: none; cursor: pointer; font-family: 'DM Sans', sans-serif; transition: transform .15s, opacity .15s; }
+.btn-main:active { transform: scale(0.97); opacity: .9; }
+
+/* MANAGE VIEW */
+.section-header { display: flex; align-items: center; justify-content: space-between; padding: 0 16px 12px; }
+.section-title { font-size: 13px; font-weight: 500; color: var(--text2); text-transform: uppercase; letter-spacing: .06em; }
+.btn-sm { display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; border-radius: 20px; font-size: 13px; font-weight: 500; border: 0.5px solid var(--border2); background: var(--surface); color: var(--text); cursor: pointer; font-family: 'DM Sans', sans-serif; transition: background .15s; }
+.btn-sm:active { background: var(--surface2); }
+.btn-sm.accent { background: var(--accent); color: #0f0f0f; border-color: transparent; }
+
+.manage-controls { display: flex; gap: 8px; padding: 0 16px 16px; flex-wrap: wrap; }
+
+.fiszka-item { display: flex; align-items: center; gap: 12px; background: var(--surface); border: 0.5px solid var(--border); border-radius: var(--radius-sm); padding: 12px 14px; margin: 0 16px 8px; }
+.fiszka-texts { flex: 1; min-width: 0; }
+.fiszka-front { font-size: 15px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fiszka-back { font-size: 13px; color: var(--text2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px; }
+.fiszka-del { width: 34px; height: 34px; border-radius: 8px; background: rgba(255,107,107,0.1); border: none; color: var(--red); font-size: 16px; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+
+.deck-item { background: var(--surface); border: 0.5px solid var(--border); border-radius: var(--radius-sm); padding: 14px 16px; margin: 0 16px 8px; display: flex; align-items: center; gap: 12px; cursor: pointer; transition: background .15s; }
+.deck-item:active { background: var(--surface2); }
+.deck-item.selected { border-color: var(--accent); }
+.deck-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--accent); flex-shrink: 0; }
+.deck-name { flex: 1; font-size: 15px; font-weight: 500; }
+.deck-count { font-size: 13px; color: var(--text2); }
+
+/* STATS VIEW */
+.stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 0 16px 16px; }
+.stat-tile { background: var(--surface); border: 0.5px solid var(--border); border-radius: var(--radius); padding: 16px; }
+.stat-num { font-family: 'DM Serif Display', serif; font-size: 36px; }
+.stat-lbl { font-size: 12px; color: var(--text2); margin-top: 4px; }
+.stat-accent { color: var(--accent); }
+.stat-green { color: var(--green); }
+.stat-amber { color: var(--amber); }
+
+.week-chart { padding: 0 16px 16px; }
+.bars { display: flex; align-items: flex-end; gap: 6px; height: 80px; }
+.bar-col { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; height: 100%; justify-content: flex-end; }
+.bar-fill { width: 100%; border-radius: 4px 4px 0 0; background: var(--accent); opacity: 0.7; min-height: 2px; transition: height .5s; }
+.bar-day { font-size: 10px; color: var(--text3); }
+.bar-today .bar-fill { opacity: 1; }
+
+.progress-ring-wrap { padding: 16px; display: flex; flex-direction: column; align-items: center; gap: 12px; }
+.deck-progress-row { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 0.5px solid var(--border); }
+.deck-progress-row:last-child { border: none; }
+.dp-name { flex: 1; font-size: 14px; }
+.dp-bar { width: 80px; height: 6px; background: var(--surface2); border-radius: 3px; overflow: hidden; }
+.dp-fill { height: 6px; background: var(--green); border-radius: 3px; }
+.dp-pct { font-size: 13px; color: var(--text2); width: 32px; text-align: right; }
+
+/* MODAL */
+.overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 200; display: flex; flex-direction: column; justify-content: flex-end; opacity: 0; pointer-events: none; transition: opacity .25s; }
+.overlay.open { opacity: 1; pointer-events: all; }
+.sheet { background: var(--surface); border-radius: 24px 24px 0 0; padding: 24px 20px calc(24px + var(--safe-bottom)); transform: translateY(100%); transition: transform .3s cubic-bezier(.4,0,.2,1); max-height: 90vh; overflow-y: auto; }
+.overlay.open .sheet { transform: translateY(0); }
+.sheet-handle { width: 36px; height: 4px; background: var(--border2); border-radius: 2px; margin: 0 auto 20px; }
+.sheet-title { font-family: 'DM Serif Display', serif; font-size: 22px; margin-bottom: 20px; }
+.field { margin-bottom: 16px; }
+.field label { display: block; font-size: 12px; color: var(--text2); margin-bottom: 8px; text-transform: uppercase; letter-spacing: .06em; }
+.field input, .field textarea, .field select { width: 100%; background: var(--bg); border: 0.5px solid var(--border2); border-radius: var(--radius-sm); padding: 12px 14px; color: var(--text); font-family: 'DM Sans', sans-serif; font-size: 15px; -webkit-appearance: none; }
+.field textarea { min-height: 80px; resize: vertical; }
+.field select { appearance: none; }
+.sheet-actions { display: flex; gap: 10px; margin-top: 8px; }
+.btn-cancel { flex: 1; padding: 14px; border-radius: var(--radius-sm); border: 0.5px solid var(--border2); background: none; color: var(--text2); font-family: 'DM Sans', sans-serif; font-size: 15px; cursor: pointer; }
+.btn-ok { flex: 2; padding: 14px; border-radius: var(--radius-sm); border: none; background: var(--accent); color: #0f0f0f; font-family: 'DM Sans', sans-serif; font-size: 15px; font-weight: 600; cursor: pointer; }
+
+/* UPLOAD */
+.upload-zone { border: 1.5px dashed var(--border2); border-radius: var(--radius-sm); padding: 24px; text-align: center; cursor: pointer; transition: background .15s; margin-bottom: 12px; }
+.upload-zone:active { background: var(--surface2); }
+.upload-ico { font-size: 32px; display: block; margin-bottom: 8px; }
+.upload-label { font-size: 14px; color: var(--text2); }
+.upload-preview { display: flex; gap: 12px; align-items: center; background: var(--bg); border-radius: var(--radius-sm); padding: 12px; margin-bottom: 12px; }
+.upload-preview img { width: 56px; height: 56px; object-fit: cover; border-radius: 8px; }
+.ai-msg { font-size: 13px; color: var(--text2); }
+.spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid var(--border2); border-top-color: var(--accent); border-radius: 50%; animation: spin .7s linear infinite; vertical-align: middle; margin-right: 6px; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.api-info { background: rgba(200,240,96,0.08); border: 0.5px solid rgba(200,240,96,0.2); border-radius: var(--radius-sm); padding: 12px; font-size: 13px; color: var(--text2); margin-bottom: 16px; line-height: 1.5; }
+.api-info strong { color: var(--accent); }
+
+.scanned-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+.scanned-item { background: var(--bg); border-radius: var(--radius-sm); padding: 10px 12px; }
+.scanned-front { font-size: 14px; font-weight: 500; }
+.scanned-back { font-size: 13px; color: var(--text2); margin-top: 2px; }
+
+/* API KEY SETTINGS */
+.settings-section { padding: 0 16px 16px; }
+.settings-row { display: flex; align-items: center; gap: 12px; background: var(--surface); border: 0.5px solid var(--border); border-radius: var(--radius-sm); padding: 14px; margin-bottom: 8px; }
+.settings-ico { font-size: 20px; flex-shrink: 0; }
+.settings-info { flex: 1; }
+.settings-name { font-size: 14px; font-weight: 500; }
+.settings-val { font-size: 12px; color: var(--text2); margin-top: 2px; font-family: monospace; }
+
+/* TOAST */
+.toast { position: fixed; bottom: calc(var(--tab-h) + var(--safe-bottom) + 16px); left: 50%; transform: translateX(-50%) translateY(20px); background: var(--text); color: var(--bg); padding: 10px 20px; border-radius: 20px; font-size: 14px; font-weight: 500; opacity: 0; pointer-events: none; transition: all .3s; white-space: nowrap; z-index: 300; }
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+/* ANIMATIONS */
+@keyframes fadeUp { from { opacity:0; transform:translateY(16px); } to { opacity:1; transform:none; } }
+.view.active > * { animation: fadeUp .3s ease both; }
+.view.active > *:nth-child(2) { animation-delay: .05s; }
+.view.active > *:nth-child(3) { animation-delay: .1s; }
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="views">
+
+    <!-- NAUKA -->
+    <div class="view active" id="view-learn">
+      <div class="view-header">
+        <div class="view-title">Nauka</div>
+        <div class="view-sub" id="learn-sub">Wybierz zestaw i zacznij</div>
+      </div>
+      <div class="learn-deck-row">
+        <select class="pill-select" id="learn-deck" onchange="initSession()"></select>
+        <button class="btn-icon" onclick="initSession()" title="Przetasuj">🔀</button>
+      </div>
+      <div class="progress-wrap">
+        <div class="progress-track"><div class="progress-fill" id="prog-fill" style="width:0%"></div></div>
+        <div class="progress-label" id="prog-label">0 / 0</div>
+      </div>
+      <div id="learn-body"></div>
+    </div>
+
+    <!-- FISZKI -->
+    <div class="view" id="view-manage">
+      <div class="view-header">
+        <div class="view-title">Fiszki</div>
+      </div>
+      <div class="manage-controls">
+        <select class="pill-select" id="manage-deck" onchange="renderCards()" style="flex:1"></select>
+      </div>
+      <div class="section-header">
+        <span class="section-title">Zestaw</span>
+        <button class="btn-sm" onclick="openAddDeck()">＋ Nowy zestaw</button>
+      </div>
+      <div id="decks-list"></div>
+      <div class="section-header" style="margin-top:8px">
+        <span class="section-title" id="cards-section-title">Fiszki</span>
+        <div style="display:flex;gap:8px">
+          <button class="btn-sm" onclick="openScan()">📷 Skanuj</button>
+          <button class="btn-sm accent" onclick="openAddCard()">＋ Dodaj</button>
+        </div>
+      </div>
+      <div id="cards-list"></div>
+    </div>
+
+    <!-- STATYSTYKI -->
+    <div class="view" id="view-stats">
+      <div class="view-header">
+        <div class="view-title">Postępy</div>
+      </div>
+      <div class="stats-grid" id="stats-grid"></div>
+      <div class="card" style="margin:0 16px 12px">
+        <div style="font-size:13px;font-weight:500;color:var(--text2);margin-bottom:12px;text-transform:uppercase;letter-spacing:.06em">Ten tydzień</div>
+        <div class="bars" id="week-bars"></div>
+      </div>
+      <div class="card" style="margin:0 16px 12px" id="deck-progress"></div>
+    </div>
+
+    <!-- USTAWIENIA -->
+    <div class="view" id="view-settings">
+      <div class="view-header">
+        <div class="view-title">Ustawienia</div>
+      </div>
+      <div class="settings-section">
+        <div class="api-info">
+          Klucz API Anthropic jest potrzebny do funkcji <strong>skanowania zdjęć</strong>. Znajdziesz go na <strong>console.anthropic.com</strong> → API Keys. Jest zapisywany tylko lokalnie na Twoim telefonie.
+        </div>
+        <div class="settings-row">
+          <div class="settings-ico">🔑</div>
+          <div class="settings-info">
+            <div class="settings-name">Klucz API Anthropic</div>
+            <div class="settings-val" id="api-key-display">Nie ustawiony</div>
+          </div>
+          <button class="btn-sm" onclick="openApiKey()">Zmień</button>
+        </div>
+        <div style="margin-top:20px;padding-top:20px;border-top:0.5px solid var(--border)">
+          <div style="font-size:13px;font-weight:500;color:var(--text2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px">Dane</div>
+          <button class="btn-sm" style="width:100%;justify-content:center;margin-bottom:8px" onclick="exportData()">📤 Eksportuj dane</button>
+          <button class="btn-sm" style="width:100%;justify-content:center;color:var(--red);border-color:rgba(255,107,107,0.3)" onclick="clearAll()">🗑 Usuń wszystkie dane</button>
+        </div>
+        <div style="margin-top:24px;text-align:center;font-size:12px;color:var(--text3)">Fiszki PWA v1.0 · Działa offline</div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- BOTTOM NAV -->
+  <nav class="bottom-nav">
+    <button class="nav-item active" onclick="switchView('learn',this)">
+      <span class="nav-icon">🧠</span>
+      <span>Nauka</span>
+    </button>
+    <button class="nav-item" onclick="switchView('manage',this)">
+      <span class="nav-icon">🗂</span>
+      <span>Fiszki</span>
+    </button>
+    <button class="nav-item" onclick="switchView('stats',this)">
+      <span class="nav-icon">📊</span>
+      <span>Postępy</span>
+    </button>
+    <button class="nav-item" onclick="switchView('settings',this)">
+      <span class="nav-icon">⚙️</span>
+      <span>Ustawienia</span>
+    </button>
+  </nav>
+</div>
+
+<!-- MODAL OVERLAY -->
+<div class="overlay" id="overlay" onclick="maybeClose(event)">
+  <div class="sheet" id="sheet">
+    <div class="sheet-handle"></div>
+    <div id="sheet-body"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ── STATE ──────────────────────────────────────────────
+let DB = {
+  decks: [],
+  cards: [],
+  stats: { totalReviews: 0, streak: 0, lastDate: null, weekData: [0,0,0,0,0,0,0] }
+};
+let session = { cards: [], index: 0, flipped: false, results: {good:0,ok:0,bad:0} };
+let scannedCards = [];
+
+function load() {
+  try {
+    let d = localStorage.getItem('fiszki_db');
+    if (d) DB = JSON.parse(d);
+    if (!DB.decks) DB.decks = [];
+    if (!DB.cards) DB.cards = [];
+    if (!DB.stats) DB.stats = { totalReviews:0, streak:0, lastDate:null, weekData:[0,0,0,0,0,0,0] };
+    if (!DB.stats.weekData) DB.stats.weekData = [0,0,0,0,0,0,0];
+  } catch(e) {}
+  if (DB.decks.length === 0) seedData();
+}
+
+function save() {
+  localStorage.setItem('fiszki_db', JSON.stringify(DB));
+}
+
+function seedData() {
+  DB.decks = [
+    { id:'d1', name:'Angielski — słówka' },
+    { id:'d2', name:'Historia Polski' }
+  ];
+  DB.cards = [
+    { id:'c1', deckId:'d1', front:'apple', back:'jabłko', status:'known', reviews:5 },
+    { id:'c2', deckId:'d1', front:'butterfly', back:'motyl', status:'learning', reviews:2 },
+    { id:'c3', deckId:'d1', front:'knowledge', back:'wiedza', status:'new', reviews:0 },
+    { id:'c4', deckId:'d1', front:'challenge', back:'wyzwanie', status:'new', reviews:0 },
+    { id:'c5', deckId:'d2', front:'Kiedy wybuchło Powstanie Warszawskie?', back:'1 sierpnia 1944', status:'known', reviews:8 },
+    { id:'c6', deckId:'d2', front:'Kto był pierwszym królem Polski?', back:'Bolesław Chrobry (1025)', status:'learning', reviews:3 },
+    { id:'c7', deckId:'d2', front:'Rok odzyskania niepodległości', back:'1918', status:'new', reviews:0 },
+  ];
+  DB.stats.weekData = [3,7,5,0,8,6,5];
+  DB.stats.totalReviews = 28;
+  DB.stats.streak = 4;
+  save();
+}
+
+function deckCards(deckId) { return DB.cards.filter(c => c.deckId === deckId); }
+function shuffle(a) { let b=[...a]; for(let i=b.length-1;i>0;i--){let j=Math.floor(Math.random()*(i+1));[b[i],b[j]]=[b[j],b[i]];} return b; }
+function uid() { return '_'+Math.random().toString(36).slice(2)+Date.now().toString(36); }
+function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;'); }
+
+// ── NAVIGATION ─────────────────────────────────────────
+function switchView(name, btn) {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
+  document.getElementById('view-'+name).classList.add('active');
+  if (btn) btn.classList.add('active');
+  if (name==='learn') initSession();
+  if (name==='manage') { populateSelects(); renderDecks(); renderCards(); }
+  if (name==='stats') renderStats();
+  if (name==='settings') renderSettings();
+}
+
+// ── SELECTS ─────────────────────────────────────────────
+function populateSelects() {
+  ['learn-deck','manage-deck'].forEach(id => {
+    let el = document.getElementById(id);
+    if (!el) return;
+    let cur = el.value;
+    el.innerHTML = DB.decks.map(d => `<option value="${d.id}">${d.name} (${deckCards(d.id).length})</option>`).join('');
+    if (cur && DB.decks.find(d=>d.id===cur)) el.value = cur;
+  });
+}
+
+// ── LEARN ───────────────────────────────────────────────
+function initSession() {
+  populateSelects();
+  let deckId = document.getElementById('learn-deck')?.value;
+  let cards = deckCards(deckId);
+  session = { cards: shuffle(cards), index:0, flipped:false, results:{good:0,ok:0,bad:0} };
+  let sub = document.getElementById('learn-sub');
+  if (sub) sub.textContent = cards.length + ' fiszek w zestawie';
+  renderCard();
+}
+
+function renderCard() {
+  let body = document.getElementById('learn-body');
+  if (!body) return;
+  updateProgress();
+  let s = session;
+
+  if (s.cards.length === 0) {
+    body.innerHTML = `<div class="empty-card"><div class="empty-ico">🗂</div><div class="empty-title">Brak fiszek</div><div class="empty-sub">Dodaj fiszki w zakładce Fiszki</div></div>`;
+    return;
+  }
+
+  if (s.index >= s.cards.length) {
+    let total = s.results.good + s.results.ok + s.results.bad;
+    let pct = total ? Math.round(s.results.good/total*100) : 0;
+    body.innerHTML = `
+      <div class="done-wrap">
+        <div class="done-ico">🎉</div>
+        <div class="done-title">Gotowe!</div>
+        <div class="done-sub">${total} fiszek powtórzonych</div>
+        <div class="done-stats">
+          <div class="done-stat"><div class="done-num" style="color:var(--green)">${s.results.good}</div><div class="done-lbl">Umiałem</div></div>
+          <div class="done-stat"><div class="done-num" style="color:var(--amber)">${s.results.ok}</div><div class="done-lbl">Tak sobie</div></div>
+          <div class="done-stat"><div class="done-num" style="color:var(--red)">${s.results.bad}</div><div class="done-lbl">Nie pamiętałem</div></div>
+          <div class="done-stat"><div class="done-num" style="color:var(--accent)">${pct}%</div><div class="done-lbl">Skuteczność</div></div>
+        </div>
+        <button class="btn-main" onclick="initSession()">🔀 Powtórz jeszcze raz</button>
+      </div>`;
+    DB.stats.totalReviews += total;
+    let today = new Date().getDay();
+    let idx = today === 0 ? 6 : today-1;
+    DB.stats.weekData[idx] = (DB.stats.weekData[idx]||0) + total;
+    save();
+    return;
+  }
+
+  let card = s.cards[s.index];
+  let statusClass = {new:'s-new',learning:'s-learning',known:'s-known'}[card.status] || 's-new';
+  let statusLabel = {new:'Nowa',learning:'W nauce',known:'Znam'}[card.status] || 'Nowa';
+
+  body.innerHTML = `
+    <div class="flip-scene">
+      <div class="flip-card${s.flipped?' flipped':''}" id="flip-card" onclick="flipCard()">
+        <div class="flip-face flip-front">
+          <span class="flip-status ${statusClass}">${statusLabel}</span>
+          <div class="flip-label">Pytanie</div>
+          <div class="flip-content">${esc(card.front)}</div>
+          <div class="flip-hint">Dotknij aby odsłonić</div>
+        </div>
+        <div class="flip-face flip-back">
+          <div class="flip-label">Odpowiedź</div>
+          <div class="flip-content">${esc(card.back)}</div>
+        </div>
+      </div>
+    </div>
+    ${s.flipped ? `
+    <div class="rating-row">
+      <button class="r-btn bad" onclick="rateCard('bad')"><span class="ico">✗</span>Nie pamiętałem</button>
+      <button class="r-btn ok" onclick="rateCard('ok')"><span class="ico">〜</span>Tak sobie</button>
+      <button class="r-btn good" onclick="rateCard('good')"><span class="ico">✓</span>Umiałem</button>
+    </div>` : `<div style="height:72px"></div>`}`;
+}
+
+function updateProgress() {
+  let s = session;
+  let pct = s.cards.length ? Math.round(s.index/s.cards.length*100) : 0;
+  let fill = document.getElementById('prog-fill');
+  let label = document.getElementById('prog-label');
+  if (fill) fill.style.width = pct+'%';
+  if (label) label.textContent = `${s.index} / ${s.cards.length}`;
+}
+
+function flipCard() {
+  session.flipped = true;
+  renderCard();
+}
+
+function rateCard(rating) {
+  let s = session;
+  let card = s.cards[s.index];
+  s.results[rating]++;
+  let orig = DB.cards.find(c=>c.id===card.id);
+  if (orig) {
+    orig.reviews++;
+    if (rating==='good') orig.status='known';
+    else if (rating==='ok') orig.status='learning';
+    else { orig.status='new'; s.cards.push({...card}); }
+  }
+  s.index++;
+  s.flipped = false;
+  save();
+  renderCard();
+}
+
+// ── MANAGE ──────────────────────────────────────────────
+function renderDecks() {
+  let el = document.getElementById('decks-list');
+  if (!el) return;
+  let cur = document.getElementById('manage-deck')?.value;
+  el.innerHTML = DB.decks.map(d => `
+    <div class="deck-item${d.id===cur?' selected':''}" onclick="selectDeck('${d.id}')">
+      <div class="deck-dot"></div>
+      <div class="deck-name">${esc(d.name)}</div>
+      <div class="deck-count">${deckCards(d.id).length}</div>
+      <button style="background:none;border:none;color:var(--red);font-size:16px;cursor:pointer;padding:4px" onclick="deleteDeck(event,'${d.id}')">🗑</button>
+    </div>`).join('') || `<div style="padding:0 16px;font-size:14px;color:var(--text2)">Brak zestawów. Utwórz pierwszy!</div>`;
+}
+
+function selectDeck(id) {
+  let sel = document.getElementById('manage-deck');
+  if (sel) { sel.value = id; }
+  renderDecks();
+  renderCards();
+}
+
+function renderCards() {
+  let deckId = document.getElementById('manage-deck')?.value;
+  let el = document.getElementById('cards-list');
+  let title = document.getElementById('cards-section-title');
+  if (!el) return;
+  let cards = deckCards(deckId);
+  if (title) title.textContent = `Fiszki (${cards.length})`;
+  el.innerHTML = cards.map(c => {
+    let badge = {new:'s-new',learning:'s-learning',known:'s-known'}[c.status];
+    let lbl = {new:'Nowa',learning:'W nauce',known:'Znam'}[c.status];
+    return `<div class="fiszka-item">
+      <div class="fiszka-texts">
+        <div class="fiszka-front">${esc(c.front)}</div>
+        <div class="fiszka-back">${esc(c.back)}</div>
+      </div>
+      <span class="flip-status ${badge}" style="position:static;margin-left:auto">${lbl}</span>
+      <button class="fiszka-del" onclick="deleteCard('${c.id}')">🗑</button>
+    </div>`;
+  }).join('') || `<div class="empty-card" style="margin:0 16px"><div class="empty-ico">📭</div><div class="empty-title">Brak fiszek</div><div class="empty-sub">Dodaj pierwszą fiszkę lub zeskanuj zdjęcie</div></div>`;
+}
+
+function deleteCard(id) {
+  DB.cards = DB.cards.filter(c=>c.id!==id);
+  save(); populateSelects(); renderCards();
+  toast('Fiszka usunięta');
+}
+
+function deleteDeck(e, id) {
+  e.stopPropagation();
+  if (!confirm('Usunąć zestaw wraz ze wszystkimi fiszkami?')) return;
+  DB.decks = DB.decks.filter(d=>d.id!==id);
+  DB.cards = DB.cards.filter(c=>c.deckId!==id);
+  save(); populateSelects(); renderDecks(); renderCards();
+  toast('Zestaw usunięty');
+}
+
+// ── MODALS ──────────────────────────────────────────────
+function openSheet(html) {
+  document.getElementById('sheet-body').innerHTML = html;
+  document.getElementById('overlay').classList.add('open');
+}
+function closeSheet() {
+  document.getElementById('overlay').classList.remove('open');
+}
+function maybeClose(e) {
+  if (e.target === document.getElementById('overlay')) closeSheet();
+}
+
+function openAddDeck() {
+  openSheet(`
+    <div class="sheet-title">Nowy zestaw</div>
+    <div class="field"><label>Nazwa zestawu</label><input id="inp-deck" type="text" placeholder="np. Matematyka, Biologia…"></div>
+    <div class="sheet-actions">
+      <button class="btn-cancel" onclick="closeSheet()">Anuluj</button>
+      <button class="btn-ok" onclick="addDeck()">Utwórz</button>
+    </div>`);
+  setTimeout(()=>document.getElementById('inp-deck')?.focus(),350);
+}
+
+function addDeck() {
+  let name = document.getElementById('inp-deck')?.value.trim();
+  if (!name) return;
+  let id = uid();
+  DB.decks.push({ id, name });
+  save(); closeSheet(); populateSelects();
+  document.getElementById('manage-deck').value = id;
+  renderDecks(); renderCards();
+  toast('Zestaw utworzony');
+}
+
+function openAddCard() {
+  let deckId = document.getElementById('manage-deck')?.value;
+  openSheet(`
+    <div class="sheet-title">Dodaj fiszkę</div>
+    <div class="field"><label>Zestaw</label>
+      <select id="inp-card-deck">${DB.decks.map(d=>`<option value="${d.id}"${d.id===deckId?' selected':''}>${esc(d.name)}</option>`).join('')}</select>
+    </div>
+    <div class="field"><label>Przód (pytanie)</label><textarea id="inp-front" placeholder="np. apple"></textarea></div>
+    <div class="field"><label>Tył (odpowiedź)</label><textarea id="inp-back" placeholder="np. jabłko"></textarea></div>
+    <div class="sheet-actions">
+      <button class="btn-cancel" onclick="closeSheet()">Anuluj</button>
+      <button class="btn-ok" onclick="addCard()">Dodaj</button>
+    </div>`);
+}
+
+function addCard() {
+  let front = document.getElementById('inp-front')?.value.trim();
+  let back = document.getElementById('inp-back')?.value.trim();
+  let deckId = document.getElementById('inp-card-deck')?.value;
+  if (!front||!back) { toast('Uzupełnij przód i tył'); return; }
+  DB.cards.push({ id:uid(), deckId, front, back, status:'new', reviews:0 });
+  save(); closeSheet(); populateSelects(); renderCards();
+  toast('Fiszka dodana ✓');
+}
+
+// ── SCAN ────────────────────────────────────────────────
+function openScan() {
+  let deckId = document.getElementById('manage-deck')?.value;
+  let apiKey = localStorage.getItem('anthropic_key')||'';
+  openSheet(`
+    <div class="sheet-title">📷 Skanuj zdjęcie</div>
+    ${!apiKey ? `<div class="api-info">⚠️ Ustaw klucz API Anthropic w <strong>Ustawieniach</strong> żeby korzystać ze skanowania.</div>` : ''}
+    <div class="field"><label>Zestaw docelowy</label>
+      <select id="scan-deck">${DB.decks.map(d=>`<option value="${d.id}"${d.id===deckId?' selected':''}>${esc(d.name)}</option>`).join('')}</select>
+    </div>
+    <input type="file" id="file-inp" accept="image/*" style="display:none" onchange="handleFile(this)">
+    <div class="upload-zone" onclick="document.getElementById('file-inp').click()">
+      <span class="upload-ico">🖼</span>
+      <div class="upload-label">Dotknij aby wybrać zdjęcie<br><span style="font-size:12px">Notatki, tablica, podręcznik…</span></div>
+    </div>
+    <div id="scan-preview"></div>
+    <div id="scan-result"></div>
+    <div class="sheet-actions" id="scan-actions" style="display:none">
+      <button class="btn-cancel" onclick="closeSheet()">Anuluj</button>
+      <button class="btn-ok" onclick="addScanned()">Dodaj fiszki</button>
+    </div>`);
+}
+
+function handleFile(input) {
+  if (!input.files?.[0]) return;
+  let file = input.files[0];
+  let reader = new FileReader();
+  reader.onload = async e => {
+    let src = e.target.result;
+    let base64 = src.split(',')[1];
+    let mime = file.type || 'image/jpeg';
+    document.getElementById('scan-preview').innerHTML = `
+      <div class="upload-preview">
+        <img src="${src}" alt="podgląd">
+        <div class="ai-msg"><span class="spinner"></span>AI analizuje zdjęcie…</div>
+      </div>`;
+    await analyzeImage(base64, mime);
+  };
+  reader.readAsDataURL(file);
+}
+
+async function analyzeImage(base64, mime) {
+  let apiKey = localStorage.getItem('anthropic_key')||'';
+  if (!apiKey) {
+    document.getElementById('scan-preview').innerHTML = `<div class="api-info">⚠️ Brak klucza API. Ustaw go w Ustawieniach.</div>`;
+    return;
+  }
+  try {
+    let resp = await fetch('https://api.anthropic.com/v1/messages', {
+      method:'POST',
+      headers:{ 'Content-Type':'application/json', 'x-api-key':apiKey, 'anthropic-version':'2023-06-01', 'anthropic-dangerous-direct-browser-access':'true' },
+      body: JSON.stringify({
+        model:'claude-sonnet-4-20250514',
+        max_tokens:1000,
+        messages:[{ role:'user', content:[
+          { type:'image', source:{ type:'base64', media_type:mime, data:base64 } },
+          { type:'text', text:'Na podstawie tego zdjęcia wygeneruj fiszki do nauki. Odpowiedz TYLKO jako JSON (bez markdown, bez backtick\u00f3w), tablica: [{"front":"...","back":"..."}]. Maks 10 fiszek. Przód = pytanie/pojęcie, tył = odpowiedź/definicja. Wyciągnij najważniejsze informacje.' }
+        ]}]
+      })
+    });
+    let data = await resp.json();
+    if (data.error) throw new Error(data.error.message);
+    let text = (data.content||[]).map(i=>i.text||'').join('');
+    scannedCards = JSON.parse(text.replace(/```json|```/g,'').trim());
+    document.getElementById('scan-preview').querySelector('.ai-msg').innerHTML = `✅ Znaleziono ${scannedCards.length} fiszek`;
+    document.getElementById('scan-result').innerHTML = `
+      <div style="font-size:13px;font-weight:500;color:var(--text2);margin:12px 0 8px">Podgląd fiszek:</div>
+      <div class="scanned-list">${scannedCards.map(c=>`
+        <div class="scanned-item"><div class="scanned-front">${esc(c.front)}</div><div class="scanned-back">${esc(c.back)}</div></div>`).join('')}
+      </div>`;
+    let actions = document.getElementById('scan-actions');
+    if (actions) actions.style.display = 'flex';
+  } catch(err) {
+    document.getElementById('scan-preview').querySelector('.ai-msg').innerHTML = `❌ Błąd: ${err.message}`;
+  }
+}
+
+function addScanned() {
+  let deckId = document.getElementById('scan-deck')?.value;
+  scannedCards.forEach(c => {
+    if (c.front&&c.back) DB.cards.push({ id:uid(), deckId, front:c.front, back:c.back, status:'new', reviews:0 });
+  });
+  save(); closeSheet(); populateSelects(); renderCards();
+  toast(`Dodano ${scannedCards.length} fiszek ✓`);
+}
+
+// ── STATS ───────────────────────────────────────────────
+function renderStats() {
+  let total = DB.cards.length;
+  let known = DB.cards.filter(c=>c.status==='known').length;
+  let learning = DB.cards.filter(c=>c.status==='learning').length;
+  let newC = DB.cards.filter(c=>c.status==='new').length;
+  let pct = total ? Math.round(known/total*100) : 0;
+
+  let sg = document.getElementById('stats-grid');
+  if (sg) sg.innerHTML = `
+    <div class="stat-tile"><div class="stat-num stat-accent">${total}</div><div class="stat-lbl">Wszystkich fiszek</div></div>
+    <div class="stat-tile"><div class="stat-num" style="color:var(--green)">${known}</div><div class="stat-lbl">Znam</div></div>
+    <div class="stat-tile"><div class="stat-num" style="color:var(--amber)">${learning}</div><div class="stat-lbl">W nauce</div></div>
+    <div class="stat-tile"><div class="stat-num">${DB.stats.streak}</div><div class="stat-lbl">Dni z rzędu 🔥</div></div>
+    <div class="stat-tile"><div class="stat-num">${DB.stats.totalReviews}</div><div class="stat-lbl">Powtórzeń łącznie</div></div>
+    <div class="stat-tile"><div class="stat-num stat-accent">${pct}%</div><div class="stat-lbl">Opanowano</div></div>`;
+
+  let days = ['Pon','Wt','Śr','Czw','Pt','Sob','Nd'];
+  let today = new Date().getDay();
+  let todayIdx = today===0?6:today-1;
+  let max = Math.max(...DB.stats.weekData, 1);
+  let wb = document.getElementById('week-bars');
+  if (wb) wb.innerHTML = DB.stats.weekData.map((v,i)=>`
+    <div class="bar-col${i===todayIdx?' bar-today':''}">
+      <div class="bar-fill" style="height:${Math.round(v/max*100)}%"></div>
+      <div class="bar-day">${days[i]}</div>
+    </div>`).join('');
+
+  let dp = document.getElementById('deck-progress');
+  if (dp) dp.innerHTML = `<div style="font-size:13px;font-weight:500;color:var(--text2);margin-bottom:12px;text-transform:uppercase;letter-spacing:.06em">Zestawy</div>` +
+    DB.decks.map(d=>{
+      let cards = deckCards(d.id);
+      let k = cards.filter(c=>c.status==='known').length;
+      let pct = cards.length ? Math.round(k/cards.length*100) : 0;
+      return `<div class="deck-progress-row">
+        <div class="dp-name">${esc(d.name)}</div>
+        <div class="dp-bar"><div class="dp-fill" style="width:${pct}%"></div></div>
+        <div class="dp-pct">${pct}%</div>
+      </div>`;
+    }).join('') || '<div style="font-size:14px;color:var(--text2)">Brak zestawów</div>';
+}
+
+// ── SETTINGS ────────────────────────────────────────────
+function renderSettings() {
+  let key = localStorage.getItem('anthropic_key')||'';
+  let disp = document.getElementById('api-key-display');
+  if (disp) disp.textContent = key ? key.slice(0,8)+'••••••••••••••••' : 'Nie ustawiony';
+}
+
+function openApiKey() {
+  let cur = localStorage.getItem('anthropic_key')||'';
+  openSheet(`
+    <div class="sheet-title">Klucz API Anthropic</div>
+    <div class="api-info">Znajdziesz go na <strong>console.anthropic.com</strong> w zakładce API Keys. Zaczyna się od <strong>sk-ant-</strong></div>
+    <div class="field"><label>Klucz API</label><input id="inp-key" type="password" placeholder="sk-ant-..." value="${esc(cur)}"></div>
+    <div class="sheet-actions">
+      <button class="btn-cancel" onclick="closeSheet()">Anuluj</button>
+      <button class="btn-ok" onclick="saveApiKey()">Zapisz</button>
+    </div>`);
+  setTimeout(()=>document.getElementById('inp-key')?.focus(),350);
+}
+
+function saveApiKey() {
+  let key = document.getElementById('inp-key')?.value.trim();
+  localStorage.setItem('anthropic_key', key||'');
+  closeSheet(); renderSettings();
+  toast(key ? 'Klucz API zapisany ✓' : 'Klucz usunięty');
+}
+
+function exportData() {
+  let blob = new Blob([JSON.stringify(DB,null,2)], {type:'application/json'});
+  let url = URL.createObjectURL(blob);
+  let a = document.createElement('a');
+  a.href=url; a.download='fiszki-backup.json'; a.click();
+  URL.revokeObjectURL(url);
+  toast('Dane wyeksportowane');
+}
+
+function clearAll() {
+  if (!confirm('Usunąć wszystkie dane? Tej operacji nie można cofnąć.')) return;
+  localStorage.clear();
+  load(); populateSelects(); renderSettings();
+  toast('Dane usunięte');
+}
+
+// ── TOAST ───────────────────────────────────────────────
+function toast(msg) {
+  let el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  setTimeout(()=>el.classList.remove('show'), 2200);
+}
+
+// ── INIT ────────────────────────────────────────────────
+load();
+populateSelects();
+initSession();
+</script>
+</body>
+</html>
